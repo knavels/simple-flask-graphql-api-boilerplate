@@ -1,18 +1,10 @@
-from models import Post, User
+from models.post import Post
+from models.user import User
 import graphene
-from graphql import GraphQLError
+
 from graphene_sqlalchemy import SQLAlchemyObjectType, SQLAlchemyConnectionField
 from db import db
-
-
-def require_auth(method):
-    def wrapper(self, *args, **kwargs):
-        auth_resp = User.decode_auth_token(args[0].context)
-        if not isinstance(auth_resp, str):
-            kwargs['user'] = User.query.filter_by(uuid=auth_resp).first()
-            return method(self, *args, **kwargs)
-        raise GraphQLError(auth_resp)
-    return wrapper
+from helpers.middlewares import require_auth
 
 
 class PostObject(SQLAlchemyObjectType):
@@ -22,10 +14,10 @@ class PostObject(SQLAlchemyObjectType):
 
 
 class UserObject(SQLAlchemyObjectType):
-   class Meta:
-       model = User
-       interfaces = (graphene.relay.Node, )
-       exclude_fields = ('password_hash')
+    class Meta:
+        model = User
+        interfaces = (graphene.relay.Node, )
+        exclude_fields = ('password_hash')
 
 
 class Viewer(graphene.ObjectType):
@@ -54,6 +46,7 @@ class SignUp(graphene.Mutation):
         password = graphene.String(required=True)
     user = graphene.Field(lambda: UserObject)
     auth_token = graphene.String()
+
     def mutate(self, info, **kwargs):
         user = User(username=kwargs.get('username'))
         user.set_password(kwargs.get('password'))
@@ -79,10 +72,10 @@ class Login(graphene.Mutation):
 class CreatePost(graphene.Mutation):
     class Arguments:
         title = graphene.String(required=True)
-        body = graphene.String(required=True) 
+        body = graphene.String(required=True)
         author_uuid = graphene.Int(required=True)
     post = graphene.Field(lambda: PostObject)
-    
+
     @require_auth
     def mutate(self, info, **kwargs):
         user = User.query.filter_by(uuid=kwargs.get('author_uuid')).first()
@@ -97,16 +90,17 @@ class CreatePost(graphene.Mutation):
 class UpdatePost(graphene.Mutation):
     class Arguments:
         title = graphene.String(required=True)
-        body = graphene.String(required=True) 
+        body = graphene.String(required=True)
         uuid = graphene.Int(required=True)
     post = graphene.Field(lambda: PostObject)
-    
+
     @require_auth
     def mutate(self, info, **kwargs):
         post = Post.query.filter_by(uuid=kwargs.get('uuid')).first()
         author = User.query.filter_by(uuid=post.author.uuid).first()
         if kwargs.get('user') != author:
-            raise GraphQLError("You do not have permissions to update this post.")
+            raise GraphQLError(
+                "You do not have permissions to update this post.")
         else:
             post.title = kwargs.get('title')
             post.body = kwargs.get('body')
@@ -119,13 +113,14 @@ class DeletePost(graphene.Mutation):
         uuid = graphene.Int(required=True)
 
     status = graphene.String()
-    
+
     @require_auth
     def mutate(self, info, **kwargs):
         post = Post.query.filter_by(uuid=kwargs.get('uuid')).first()
         author = User.query.filter_by(uuid=post.author.uuid).first()
         if kwargs.get('user') != author:
-            raise GraphQLError("You do not have permissions to delete this post.")
+            raise GraphQLError(
+                "You do not have permissions to delete this post.")
         else:
             db.session.delete(post)
             db.session.commit()
