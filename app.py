@@ -1,11 +1,13 @@
 # Imports
 from flask import Flask
-from flask_script import Manager
+from flask_script import Manager, Command
 from flask_migrate import Migrate, MigrateCommand
 from flask_graphql import GraphQLView
 from flask_cors import CORS
 import os
 from db import db
+from env import admin_default_pass, admin_seeder
+
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 # app initialization
@@ -20,12 +22,32 @@ app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = True
 app.config['SECRET_KEY'] = "somesecret"
 
+# seeders
+
+
+class AdminSeeder(Command):
+    "prints hello world"
+
+    def run(self):
+        from models.user import User
+        if admin_seeder & admin_seeder == True:
+            user = User(username='admin')
+            user.set_password(
+                admin_default_pass if admin_default_pass else '123456')
+            db.session.add(user)
+            db.session.commit()
+        else:
+            print('admin_seeder is inactive, checkout the env.py')
+
+
 # Modules
 db.init_app(app)
 migrate = Migrate(app, db)
-
 manager = Manager(app)
 manager.add_command('db', MigrateCommand)
+manager.add_command('seed_admin', AdminSeeder())
+
+
 # Routes
 
 

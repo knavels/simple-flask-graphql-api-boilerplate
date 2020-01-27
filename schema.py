@@ -1,7 +1,7 @@
 from models.post import Post
 from models.user import User
 import graphene
-
+from graphql import GraphQLError
 from graphene_sqlalchemy import SQLAlchemyObjectType, SQLAlchemyConnectionField
 from db import db
 from helpers.middlewares import require_auth
@@ -18,26 +18,6 @@ class UserObject(SQLAlchemyObjectType):
         model = User
         interfaces = (graphene.relay.Node, )
         exclude_fields = ('password_hash')
-
-
-class Viewer(graphene.ObjectType):
-    class Meta:
-        interfaces = (graphene.relay.Node, )
-
-    all_posts = SQLAlchemyConnectionField(PostObject)
-    all_users = SQLAlchemyConnectionField(UserObject)
-
-
-class Query(graphene.ObjectType):
-    node = graphene.relay.Node.Field()
-    viewer = graphene.Field(Viewer)
-
-    @staticmethod
-    def resolve_viewer(root, info):
-        auth_resp = User.decode_auth_token(info.context)
-        if not isinstance(auth_resp, str):
-            return Viewer()
-        raise GraphQLError(auth_resp)
 
 
 class SignUp(graphene.Mutation):
@@ -125,6 +105,26 @@ class DeletePost(graphene.Mutation):
             db.session.delete(post)
             db.session.commit()
             return DeletePost(status="OK")
+
+
+class Viewer(graphene.ObjectType):
+    class Meta:
+        interfaces = (graphene.relay.Node, )
+
+    all_posts = SQLAlchemyConnectionField(PostObject)
+    all_users = SQLAlchemyConnectionField(UserObject)
+
+
+class Query(graphene.ObjectType):
+    node = graphene.relay.Node.Field()
+    viewer = graphene.Field(Viewer)
+
+    @staticmethod
+    def resolve_viewer(root, info):
+        auth_resp = User.decode_auth_token(info.context)
+        if not isinstance(auth_resp, str):
+            return Viewer()
+        raise GraphQLError(auth_resp)
 
 
 class Mutation(graphene.ObjectType):
