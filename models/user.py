@@ -35,6 +35,7 @@ class User(db.Model):
 
     @staticmethod
     def decode_auth_token(request):
+        # print(request.headers)
         auth_header = request.headers.get('Authorization')
         if auth_header:
             auth_token = auth_header.split(" ")[1]
